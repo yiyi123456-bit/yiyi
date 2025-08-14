@@ -151,7 +151,7 @@ class GeminiClient:
         model = request.model
         format_type = getattr(request, 'format_type', None)
         if format_type and (format_type == "gemini"):
-            api_version = "v1alpha" if "think" in request.model or request.thinking_budget is not None else "v1beta"
+            api_version = "v1alpha" if "think" in request.model else "v1beta"
             if request.payload:
                 # 将 Pydantic 模型转换为字典, 假设 Pydantic V2+
                 data = request.payload.model_dump(exclude_none=True)
@@ -194,7 +194,8 @@ class GeminiClient:
             }
         generationConfig = {k: v for k, v in config_params.items() if v is not None}
         
-        api_version = "v1alpha" if "think" in request.model else "v1beta"
+        # 修改后的代码
+        api_version = "v1alpha" if request.thinking_budget is not None else "v1beta"
         
         data = {
             "contents": contents,
@@ -202,8 +203,8 @@ class GeminiClient:
             "safetySettings": safety_settings,
         }
 
-     # --- 函数调用处理 ---
-     # 1. 添加 tools (函数声明)
+        # --- 函数调用处理 ---
+        # 1. 添加 tools (函数声明)
         function_declarations = []
         if request.tools:
             # 显式提取 Gemini API 所需的字段，避免包含 'id' 等无效字段
@@ -258,7 +259,7 @@ class GeminiClient:
                 tool_config = {"function_calling_config": config}
         
         # 3. 添加 tool_config 到 data
-       if tool_config and function_declarations:
+        if tool_config and function_declarations:
             data["tool_config"] = tool_config
 
         if system_instruction:
@@ -470,3 +471,15 @@ class GeminiClient:
             models.extend(GeminiClient.EXTRA_MODELS)
                 
             return models
+
+    @staticmethod
+    async def list_native_models(api_key):
+        """
+        获取原生Gemini模型列表
+        """
+        url = "https://generativelanguage.googleapis.com/v1beta/models?key={}".format(
+            api_key)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
